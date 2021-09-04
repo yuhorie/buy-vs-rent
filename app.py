@@ -1,3 +1,4 @@
+from typing import Text
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -24,7 +25,7 @@ def plot_net_balance(source):
     line = alt.Chart(source).mark_line(interpolate='basis', point=True).encode(
         x='Year:Q',
         y='Net Balance ($):Q',
-        color='category:N'
+        color=alt.Color('Home:N', legend=alt.Legend(orient="bottom"))
     )
 
     # Transparent selectors across the chart. This is what tells us
@@ -68,7 +69,7 @@ st.sidebar.subheader("Buy Parameters")
 home_value = 1e6 * st.sidebar.slider("Home Value (M$)", value=1.7, min_value=0.5, max_value=3.0, step=0.01)
 down_payment_percent = 1e-2 * st.sidebar.slider("Down Payment (%)", value=20, min_value=0, max_value=100, step=5)
 HOA = st.sidebar.slider("Monthly HOA ($)", value=0, min_value=0, max_value=500, step=10)
-apr = 1e-2 * st.sidebar.slider("Interest (%)", value=2.875, min_value=0.0, max_value=5.0, step=0.001)
+apr = 1e-2 * st.sidebar.slider("Interest (%)", value=2.88, min_value=0.0, max_value=5.0, step=0.001)
 home_appreciation = 1e-2 * st.sidebar.slider("Yearly Home Appreciation (%)", value=5.0, min_value=0.0, max_value=20.0, step=0.1)
 selling_fee = 1e-2 * st.sidebar.slider("Selling Cost (%)", value=6.0, min_value=0.0, max_value=10.0, step=0.1)
 
@@ -158,6 +159,10 @@ df_year_rent["Saving"] = saving * 12
 df_year_rent["Asset"] = np.round(fv_annuity(stock_growth, df_year_rent.index, saving * 12), 2)
 df_year_rent["Net"] = df_year_rent["Asset"] - df_year_rent["Cumulative Rent"]
 
+st.title("Buy vs Rent Calculator")
+st.markdown("""
+- Adjust the variables from sidebar
+""")
 st.markdown("***")
 col_buy, col_rent = st.columns(2)
 with col_buy:
@@ -190,47 +195,44 @@ st.markdown("***")
 st.subheader("Assumptions")
 st.markdown(f"""
 - The monthly mortgage payment by buying a house is **${total_payment:,}**, while rent is **${rent:,}** per month.
-The renter can invest the leftover of **${(total_payment-rent):,}** per month in the stock market
+The renter invests the leftover of **${(total_payment-rent):,}** per month in the stock market
 - Home value appreciates **{home_appreciation*100:g}%** every year
 - Stock market grows by **{stock_growth*100:g}%** every year
 - Net balance for the two scenarios...
     - [Buy] While you pay principal/interest/property tax etc, your home value will appreciate **{home_appreciation*100:g}%** every year. The net balance is calculated by the sum of the total mortgage payment, remaining loan, the appreciated home value with selling cost of **{selling_fee*100:g}%**. No capital gain is considered.
-    - [Rent] You pay less for the rent than the mortgage in general, but you can invest the difference into stock market with the growth of **{stock_growth*100:g}%** every year (*compound interest*).
+    - [Rent] You pay less for the rent than the mortgage in general, so you can invest the difference into stock market with the growth of **{stock_growth*100:g}%** every year (*compound interest*). No capital gain is considered.
 """)
 
 st.markdown("***")
 
 source = pd.DataFrame(np.array([df_year.loc[1:plot_years, "Net"], df_year_rent.loc[1:plot_years, "Net"]]).T,
                     columns=['Buy', 'Rent'], index=pd.RangeIndex(plot_years, name='Year'))
-source = source.reset_index().melt('Year', var_name='category', value_name='Net Balance ($)')
+source = source.reset_index().melt('Year', var_name='Home', value_name='Net Balance ($)')
 chart_net_balance = plot_net_balance(source)
 
-with st.container():
-    st.subheader("Net Balance over Years (Buy vs Rent)")
-    st.altair_chart(chart_net_balance, use_container_width=True)
-
+st.subheader("Net Balance over Years (Buy vs Rent)")
+st.altair_chart(chart_net_balance, use_container_width=True)
 
 st.markdown("***")
 source = pd.DataFrame({
     'Year': np.arange(plot_years),
-    'Home Value ($)': df_year.loc[1:plot_years, "Home Value"] / (1 - selling_fee),
     'Home Value (M$)': (df_year.loc[1:plot_years, "Home Value"] / (1 - selling_fee) / 1e6).round(2)
 })
 
-bars = alt.Chart(source).mark_bar(point=True).encode(
-    x='Year',
-    y='Home Value ($)'
+bars = alt.Chart(source).mark_line(interpolate='basis', point=True).encode(
+    alt.X('Year'),
+    alt.Y('Home Value (M$)', axis=alt.Axis(format='M')),
+    tooltip='Home Value (M$)',
 )
 
 text = bars.mark_text(
     align='center',
     baseline='bottom',
-    dx=2  # Nudges text to right so it doesn't appear on top of the bar
 ).encode(
-    text='Home Value (M$):Q'
+    alt.Text('Home Value (M$):Q')
 )
 
-c = (bars + text).properties(height=400)
+c = (bars + text).properties(width=500, height=400)
 
 with st.container():
     st.subheader("Home Value over Years")
