@@ -66,19 +66,19 @@ mode = st.sidebar.selectbox("Menu", ["Buy vs Rent"])
 plot_years = st.sidebar.slider("Plot Until X Years", value=15, min_value=5, max_value=30, step=1)
 st.sidebar.markdown("***")
 st.sidebar.subheader("Buy Parameters")
-home_value = 1e6 * st.sidebar.slider("Home Value (M$)", value=1.7, min_value=0.5, max_value=3.0, step=0.01)
+home_value = 1e6 * st.sidebar.slider("Home Value (M$)", value=1.5, min_value=0.5, max_value=3.0, step=0.01)
 down_payment_percent = 1e-2 * st.sidebar.slider("Down Payment (%)", value=20, min_value=0, max_value=100, step=5)
 HOA = st.sidebar.slider("Monthly HOA ($)", value=0, min_value=0, max_value=500, step=10)
-apr = 1e-2 * st.sidebar.slider("Interest (%)", value=2.88, min_value=0.0, max_value=5.0, step=0.001)
+apr = 1e-2 * st.sidebar.slider("Interest (%)", value=2.9, min_value=0.0, max_value=5.0, step=0.001)
 home_appreciation = 1e-2 * st.sidebar.slider("Yearly Home Appreciation (%)", value=5.0, min_value=0.0, max_value=20.0, step=0.1)
 selling_fee = 1e-2 * st.sidebar.slider("Selling Cost (%)", value=6.0, min_value=0.0, max_value=10.0, step=0.1)
 
 st.sidebar.markdown("***")
 st.sidebar.subheader("Rent Parameters")
-rent = st.sidebar.slider("Monthly Rent ($)", value=4200, min_value=500, max_value=10000, step=100)
+rent = st.sidebar.slider("Monthly Rent ($)", value=4000, min_value=500, max_value=10000, step=100)
 stock_growth = 1e-2 * st.sidebar.slider("Yearly Stock Growth (%)", value=10.0, min_value=0.0, max_value=50.0, step=1.0)
 
-tax_rate = 0.0077
+tax_rate = 0.0125
 property_tax = np.round(home_value * tax_rate / 12)
 home_insurance = 100
 principal = home_value * (1 - down_payment_percent)
@@ -100,7 +100,7 @@ total_payment = mortgage + property_tax + HOA + home_insurance
 if total_payment - rent > 0:
     saving = total_payment - rent
 else:
-    saving = 0
+    saving = 0.0
 
 rng = pd.date_range(start_date, periods=periods, freq="MS")
 rng.name = "Payment Date"
@@ -108,7 +108,6 @@ keys = ["Payment", "P&I", "Fees", "Principal Paid", "Interest Paid", "Starting B
 df = pd.DataFrame(index=rng, columns=keys, dtype="float")
 df.reset_index(inplace=True)
 df.index += 1
-df.index.name = "Period"
 
 df["P&I"] = mortgage
 df["Fees"] = property_tax + HOA + home_insurance
@@ -129,35 +128,34 @@ df["Cumulative Payment"] = df["Payment"].cumsum()
 
 rng = pd.date_range(start=start_date, periods=years, freq="AS")
 rng.name = "Payment Year"
-keys = ["Payment", "P&I", "Fees", "Principal Paid", "Interest Paid", "Starting Balance", "Ending Balance", "Cumulative Principal", "Cumulative Payment", "Home Value", "Net"]
-df_year = pd.DataFrame(index=rng, columns=keys, dtype="float")
-df_year.reset_index(inplace=True)
-df_year.index += 1
-df_year.index.name = "Period"
-
-df_year["P&I"] = mortgage * months
-df_year["Fees"] = (property_tax + HOA + home_insurance) * months
-df_year["Payment"] = (mortgage + property_tax + HOA + home_insurance) * months
+keys = ["Year", "Payment", "P&I", "Fees", "Principal Paid", "Interest Paid", "Starting Balance", "Ending Balance", "Cumulative Principal", "Cumulative Payment", "Home Value", "Net"]
+df_year_buy = pd.DataFrame(index=rng, columns=keys, dtype="float")
+df_year_buy.reset_index(inplace=True)
+df_year_buy.index += 1
+df_year_buy["Year"] = df_year_buy.index
+df_year_buy["P&I"] = mortgage * months
+df_year_buy["Fees"] = (property_tax + HOA + home_insurance) * months
+df_year_buy["Payment"] = (mortgage + property_tax + HOA + home_insurance) * months
 for year in range(1, years+1):
-    df_year.loc[year, "Interest Paid"] = np.sum(df.loc[1+months*(year-1):months * year, "Interest Paid"])
-    df_year.loc[year, "Principal Paid"] = np.sum(df.loc[1+months*(year-1):months * year, "Principal Paid"])
-    df_year.loc[year, "Starting Balance"] = df.loc[1+months*(year-1), "Starting Balance"]
-    df_year.loc[year, "Ending Balance"] = df.loc[months * year, "Ending Balance"]
-df_year["Cumulative Principal"] = df_year["Principal Paid"].cumsum()
-df_year["Cumulative Payment"] = df_year["Payment"].cumsum()
-df_year["Home Value"] = np.round((home_value * (1 + home_appreciation) ** (df_year.index - 1)) * (1 - selling_fee), 2)
-df_year["Net"] = df_year["Home Value"] - df_year["Ending Balance"] - df_year["Cumulative Payment"] - down_payment
+    df_year_buy.loc[year, "Interest Paid"] = np.sum(df.loc[1+months*(year-1):months * year, "Interest Paid"])
+    df_year_buy.loc[year, "Principal Paid"] = np.sum(df.loc[1+months*(year-1):months * year, "Principal Paid"])
+    df_year_buy.loc[year, "Starting Balance"] = df.loc[1+months*(year-1), "Starting Balance"]
+    df_year_buy.loc[year, "Ending Balance"] = df.loc[months * year, "Ending Balance"]
+df_year_buy["Cumulative Principal"] = df_year_buy["Principal Paid"].cumsum()
+df_year_buy["Cumulative Payment"] = df_year_buy["Payment"].cumsum()
+df_year_buy["Home Value"] = np.round((home_value * (1 + home_appreciation) ** df_year_buy.index) * (1 - selling_fee), 2)
+df_year_buy["Net"] = df_year_buy["Home Value"] - df_year_buy["Ending Balance"] - df_year_buy["Cumulative Payment"] - down_payment
 
-keys = ["Rent", "Cumulative Rent", "Saving", "Asset", "Net"]
+keys = ["Year", "Rent", "Cumulative Rent", "Saving", "Asset", "Net"]
 df_year_rent = pd.DataFrame(index=rng, columns=keys, dtype="float")
 df_year_rent.reset_index(inplace=True)
 df_year_rent.index += 1
-df_year_rent.index.name = "Period"
+df_year_rent["Year"] = df_year_rent.index
 df_year_rent["Rent"] = rent * 12
 df_year_rent["Cumulative Rent"] = df_year_rent["Rent"].cumsum()
 df_year_rent["Saving"] = saving * 12
-df_year_rent["Asset"] = np.round(fv_annuity(stock_growth, df_year_rent.index, saving * 12), 2)
-df_year_rent["Net"] = df_year_rent["Asset"] - df_year_rent["Cumulative Rent"]
+df_year_rent["Asset"] = np.round(fv_annuity(stock_growth, df_year_rent.index, saving * 12) + down_payment * (1 + stock_growth) ** df_year_rent.index, 2)
+df_year_rent["Net"] = df_year_rent["Asset"] - df_year_rent["Cumulative Rent"] - down_payment - df_year_rent.index * saving * 12
 
 st.title("Buy vs Rent Calculator")
 st.markdown("""
@@ -186,7 +184,7 @@ st.subheader("Mortgage breakdown")
 st.markdown(f"""
 - Monthly mortgage payment in total: ${total_payment:,}
     - Principal and Interest: ${mortgage:,}
-    - Property Tax: ${property_tax:,}
+    - Property Tax: ${property_tax:,} (${property_tax*12:,} per year, rate: {tax_rate*100:,}%)
     - HOA: ${HOA:,}
     - Home Insurance: ${home_insurance:,}
 """)
@@ -195,7 +193,7 @@ st.markdown("***")
 st.subheader("Assumptions")
 st.markdown(f"""
 - The monthly mortgage payment by buying a house is **${total_payment:,}**, while rent is **${rent:,}** per month.
-The renter invests the leftover of **${(total_payment-rent):,}** per month in the stock market
+The renter invests the leftover of **${np.round(saving, 2):,}** per month into the stock market. The rentor also invests **${down_payment:,}** as he/she would not need to pay down payment.
 - Home value appreciates **{home_appreciation*100:g}%** every year
 - Stock market grows by **{stock_growth*100:g}%** every year
 - Net balance for the two scenarios...
@@ -205,8 +203,8 @@ The renter invests the leftover of **${(total_payment-rent):,}** per month in th
 
 st.markdown("***")
 
-source = pd.DataFrame(np.array([df_year.loc[1:plot_years, "Net"], df_year_rent.loc[1:plot_years, "Net"]]).T,
-                    columns=['Buy', 'Rent'], index=pd.RangeIndex(plot_years, name='Year'))
+source = pd.DataFrame(np.array([df_year_buy.loc[:plot_years, "Net"], df_year_rent.loc[:plot_years, "Net"]]).T,
+                    columns=['Buy', 'Rent'], index=pd.RangeIndex(plot_years, name='Year')+1)
 source = source.reset_index().melt('Year', var_name='Home', value_name='Net Balance ($)')
 chart_net_balance = plot_net_balance(source)
 
@@ -215,8 +213,8 @@ st.altair_chart(chart_net_balance, use_container_width=True)
 
 st.markdown("***")
 source = pd.DataFrame({
-    'Year': np.arange(plot_years),
-    'Home Value (M$)': (df_year.loc[1:plot_years, "Home Value"] / (1 - selling_fee) / 1e6).round(2)
+    'Year': np.arange(plot_years)+1,
+    'Home Value (M$)': (df_year_buy.loc[:plot_years, "Home Value"] / (1 - selling_fee) / 1e6).round(2)
 })
 
 bars = alt.Chart(source).mark_line(interpolate='basis', point=True).encode(
@@ -237,3 +235,15 @@ c = (bars + text).properties(width=500, height=400)
 with st.container():
     st.subheader("Home Value over Years")
     st.altair_chart(c, use_container_width=True)
+
+
+st.markdown("***")
+
+# df_year_buy_show = df_year_buy
+df_year_buy_show = df_year_buy[["Year", "Principal Paid", "Interest Paid", "Starting Balance", "Ending Balance", "Cumulative Principal", "Cumulative Payment", "Home Value", "Net"]]
+st.dataframe(df_year_buy_show)
+
+
+st.markdown("***")
+df_year_rent_show = df_year_rent[["Year", "Rent", "Cumulative Rent", "Saving", "Asset", "Net"]]
+st.dataframe(df_year_rent_show)
