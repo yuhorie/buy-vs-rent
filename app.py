@@ -160,6 +160,7 @@ df_year_rent["Net"] = df_year_rent["Asset"] - df_year_rent["Cumulative Rent"] - 
 st.title("Buy vs Rent Calculator")
 st.markdown("""
 - Adjust the variables from sidebar
+- Source code: https://github.com/yuhorie/buy-vs-rent/blob/master/app.py
 """)
 st.markdown("***")
 col_buy, col_rent = st.columns(2)
@@ -193,12 +194,13 @@ st.markdown("***")
 st.subheader("Assumptions")
 st.markdown(f"""
 - The monthly mortgage payment by buying a house is **${total_payment:,}**, while rent is **${rent:,}** per month.
-The renter invests the leftover of **${np.round(saving, 2):,}** per month into the stock market. The rentor also invests **${down_payment:,}** as he/she would not need to pay down payment.
+So, the renter can invest the difference of **${np.round(saving, 2):,}** per month into the stock market. The renter also holds **${down_payment:,}** in the form of stock as he/she would not need to pay down payment.
 - Home value appreciates **{home_appreciation*100:g}%** every year
 - Stock market grows by **{stock_growth*100:g}%** every year
-- Net balance for the two scenarios...
-    - [Buy] While you pay principal/interest/property tax etc, your home value will appreciate **{home_appreciation*100:g}%** every year. The net balance is calculated by the sum of the total mortgage payment, remaining loan, the appreciated home value with selling cost of **{selling_fee*100:g}%**. No capital gain is considered.
-    - [Rent] You pay less for the rent than the mortgage in general, so you can invest the difference into stock market with the growth of **{stock_growth*100:g}%** every year (*compound interest*). No capital gain is considered.
+- What is the net balance?
+    - *As a home buyer,* your loss is interest, property tax, and HOA etc. You gain comes from the home value appreciation **{home_appreciation*100:g}%** every year.
+    - *As a renter,* your loss is just a monthly rent. Your gain comes from the stock appreciation for the initial down payment amount of **${down_payment:,}** + monthly saving of **${np.round(saving, 2):,}** with the growth of **{stock_growth*100:g}%** every year.
+    - No capital gain tax is considered.
 """)
 
 st.markdown("***")
@@ -233,17 +235,20 @@ text = bars.mark_text(
 c = (bars + text).properties(width=500, height=400)
 
 with st.container():
-    st.subheader("Home Value over Years")
+    st.subheader(f"Home Value over Years (minus selling cost of {selling_fee*100:g}%)")
     st.altair_chart(c, use_container_width=True)
 
 
 st.markdown("***")
 
+st.subheader("Raw data for buy")
 # df_year_buy_show = df_year_buy
 df_year_buy_show = df_year_buy[["Year", "Principal Paid", "Interest Paid", "Starting Balance", "Ending Balance", "Cumulative Principal", "Cumulative Payment", "Home Value", "Net"]]
 st.dataframe(df_year_buy_show)
 
 
 st.markdown("***")
+st.subheader("Raw data for rent")
+
 df_year_rent_show = df_year_rent[["Year", "Rent", "Cumulative Rent", "Saving", "Asset", "Net"]]
 st.dataframe(df_year_rent_show)
